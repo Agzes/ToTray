@@ -154,7 +154,7 @@ pub fn autostart(add: bool) {
                 }
                 lines.push("".to_string());
                 lines.push("# ToTray: Autorun manager for Hyprland".to_string());
-                lines.push(format!("exec-once = {} --gui", bin_path.display()));
+                lines.push(format!("exec-once = {}", bin_path.display()));
             }
             let _ = std::fs::write(&hypr_conf, lines.join("\n") + "\n");
         }

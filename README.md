@@ -1,4 +1,9 @@
+
+
 <div align="center">
+  <kbd>⚠️ The utility is under development and may contain errors. ⚠️</kbd>
+  <br>
+  
   <kbd>🦀 Rust</kbd>
   <kbd>🪶 GTK4</kbd>
   <kbd>📂 Open-Source</kbd>

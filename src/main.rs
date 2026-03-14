@@ -16,8 +16,8 @@ use std::sync::{Arc, Mutex};
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    #[arg(short, long, help = "Launch the settings GUI")]
-    gui: bool,
+    #[arg(short, long, help = "Start only the backend worker (no GUI)")]
+    worker: bool,
 
     #[arg(long, help = "Check if ToTray is correctly installed")]
     hello: bool,
@@ -103,7 +103,7 @@ impl Tray for ToTrayIcon {
                 label: "Settings".into(),
                 activate: Box::new(|_| {
                     let exe = std::env::current_exe().unwrap_or_else(|_| "totray".into());
-                    let _ = std::process::Command::new(exe).arg("--gui").spawn();
+                    let _ = std::process::Command::new(exe).spawn();
                 }),
                 ..Default::default()
             }),
@@ -197,7 +197,7 @@ fn main() -> glib::ExitCode {
 
     let silent = { state.lock().unwrap().silent_mode };
 
-    if !args.gui {
+    if args.worker {
         println!("ToTray backend starting...");
         backend::start_backend(state.clone());
         let tray = ToTrayIcon {
@@ -221,6 +221,9 @@ fn main() -> glib::ExitCode {
         glib::MainLoop::new(None, false).run();
         return glib::ExitCode::from(0);
     }
+
+    println!("ToTray starting...");
+    backend::start_backend(state.clone());
 
     let app = Application::builder().application_id(state::APP_ID).build();
     let state_ui = state.clone();

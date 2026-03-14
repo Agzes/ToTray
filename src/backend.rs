@@ -154,7 +154,7 @@ pub fn autostart(add: bool) {
                 }
                 lines.push("".to_string());
                 lines.push("# ToTray: Autorun manager for Hyprland".to_string());
-                lines.push(format!("exec-once = {}", bin_path.display()));
+                lines.push(format!("exec-once = {} --worker", bin_path.display()));
             }
             let _ = std::fs::write(&hypr_conf, lines.join("\n") + "\n");
         }
@@ -267,7 +267,7 @@ pub fn setup_desktop_file() -> bool {
             "[Desktop Entry]\n\
              Name=ToTray\n\
              Comment=Autorun and Tray Manager for Hyprland\n\
-             Exec={} --gui\n\
+             Exec={}\n\
              Icon=totray\n\
              Terminal=false\n\
              Type=Application\n\
@@ -276,7 +276,7 @@ pub fn setup_desktop_file() -> bool {
              Actions=Settings;\n\n\
              [Desktop Action Settings]\n\
              Name=Settings\n\
-             Exec={} --gui\n",
+             Exec={}\n",
             target_bin.display(),
             target_bin.display()
         );

@@ -998,7 +998,7 @@ pub fn build_ui(app: &Application, state: SharedState) -> ApplicationWindow {
     });
 
     let silent = { state.lock().unwrap().silent_mode };
-    if silent && !std::env::args().any(|a| a == "--gui") {
+    if silent && std::env::args().any(|a| a == "--worker") {
         let app_id = crate::state::APP_ID.to_string();
         glib::timeout_add_local_once(std::time::Duration::from_millis(100), move || {
             crate::hypr::hide_to_special(&app_id);

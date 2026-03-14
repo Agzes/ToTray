@@ -137,6 +137,7 @@ impl Tray for ToTrayIcon {
 }
 
 fn main() -> glib::ExitCode {
+    backend::sync_binary();
     let args = Args::parse();
 
     if args.hello {

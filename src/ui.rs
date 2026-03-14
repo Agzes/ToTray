@@ -655,6 +655,7 @@ pub fn build_ui(app: &Application, state: SharedState) -> ApplicationWindow {
         .label("Skip")
         .css_classes(["version-btn"])
         .halign(Align::Center)
+        .margin_bottom(12)
         .build();
 
     let s_c_d = stack.clone();

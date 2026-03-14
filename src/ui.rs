@@ -372,25 +372,17 @@ pub fn build_ui(app: &Application, state: SharedState) -> ApplicationWindow {
     let window = ApplicationWindow::builder()
         .application(app)
         .title("ToTray")
-        .default_width(220)
+        .default_width(320)
         .default_height(600)
         .resizable(true)
         .build();
     window.set_icon_name(Some(crate::state::APP_ID));
 
-    let root_scrolled = gtk::ScrolledWindow::builder()
-        .hexpand(true)
-        .vexpand(true)
-        .hscrollbar_policy(gtk::PolicyType::Never)
-        .min_content_width(80)
-        .build();
-
     let root_vbox = GBox::new(Orientation::Vertical, 0);
     root_vbox.add_css_class("main-box");
     root_vbox.set_halign(Align::Fill);
     root_vbox.set_hexpand(true);
-    root_scrolled.set_child(Some(&root_vbox));
-    window.set_child(Some(&root_scrolled));
+    window.set_child(Some(&root_vbox));
 
     let header_box = GBox::new(Orientation::Horizontal, 8);
     header_box.add_css_class("header-box");
@@ -435,7 +427,13 @@ pub fn build_ui(app: &Application, state: SharedState) -> ApplicationWindow {
     title_hbox.append(&combined_btn);
 
     title_vbox.append(&title_hbox);
-    title_vbox.append(&Label::builder().use_markup(true).label("<b>AutoRun utility for hyprland</b> • by <a href='https://github.com/agzes'>agzes</a>").halign(Align::Start).css_classes(["app-subtitle"]).build());
+    title_vbox.append(&Label::builder()
+        .use_markup(true)
+        .label("<b>AutoRun utility for hyprland</b> • by <a href='https://github.com/agzes'>agzes</a>")
+        .halign(Align::Start)
+        .wrap(true)
+        .css_classes(["app-subtitle"])
+        .build());
     header_box.append(&title_vbox);
 
     let filler = GBox::new(Orientation::Horizontal, 0);
@@ -484,12 +482,33 @@ pub fn build_ui(app: &Application, state: SharedState) -> ApplicationWindow {
 
     let main_vbox = GBox::new(Orientation::Vertical, 0);
     main_vbox.set_hexpand(true);
+
+    let compat_scrolled = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::Never)
+        .vexpand(true)
+        .min_content_height(100)
+        .build();
     let compat_vbox = GBox::new(Orientation::Vertical, 0);
     compat_vbox.set_hexpand(true);
+    compat_scrolled.set_child(Some(&compat_vbox));
+
+    let warning_scrolled = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::Never)
+        .vexpand(true)
+        .min_content_height(100)
+        .build();
     let warning_vbox = GBox::new(Orientation::Vertical, 0);
     warning_vbox.set_hexpand(true);
+    warning_scrolled.set_child(Some(&warning_vbox));
+
+    let desktop_scrolled = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::Never)
+        .vexpand(true)
+        .min_content_height(100)
+        .build();
     let desktop_vbox = GBox::new(Orientation::Vertical, 0);
     desktop_vbox.set_hexpand(true);
+    desktop_scrolled.set_child(Some(&desktop_vbox));
 
     let warning_spacer_top = GBox::new(Orientation::Vertical, 0);
     warning_spacer_top.set_vexpand(true);
@@ -517,13 +536,19 @@ pub fn build_ui(app: &Application, state: SharedState) -> ApplicationWindow {
             .label("Auto-start & Tray Manager")
             .css_classes(["welcome-subtitle"])
             .halign(Align::Center)
+            .wrap(true)
             .build(),
     );
 
     let note_box = GBox::new(Orientation::Vertical, 8);
     note_box.add_css_class("info-note");
     note_box.set_halign(Align::Center);
-    note_box.append(&Label::builder().use_markup(true).label("<span size='large' weight='800'>Hyprland Only</span>\n\nThis tool is designed specifically for Hyprland using hyprctl dispatch commands.").justify(gtk::Justification::Center).build());
+    note_box.append(&Label::builder()
+        .use_markup(true)
+        .label("<span size='large' weight='800'>Hyprland Only</span>\n\nThis tool is designed specifically for Hyprland using hyprctl dispatch commands.")
+        .justify(gtk::Justification::Center)
+        .wrap(true)
+        .build());
     warning_content.append(&note_box);
 
     warning_vbox.append(&warning_content);
@@ -576,13 +601,19 @@ pub fn build_ui(app: &Application, state: SharedState) -> ApplicationWindow {
             .label("For proper Auto-Start and Tray functionality")
             .css_classes(["welcome-subtitle"])
             .halign(Align::Center)
+            .wrap(true)
             .build(),
     );
 
     let d_note_box = GBox::new(Orientation::Vertical, 8);
     d_note_box.add_css_class("info-note");
     d_note_box.set_halign(Align::Center);
-    d_note_box.append(&Label::builder().use_markup(true).label("<span size='large' weight='800'>Desktop Shortcut</span>\n\nToTray needs to be registered as an application to support system tray protocols and reliable auto-start.").justify(gtk::Justification::Center).build());
+    d_note_box.append(&Label::builder()
+        .use_markup(true)
+        .label("<span size='large' weight='800'>Desktop Shortcut</span>\n\nToTray needs to be registered as an application to support system tray protocols and reliable auto-start.")
+        .justify(gtk::Justification::Center)
+        .wrap(true)
+        .build());
 
     if !crate::backend::is_in_path() {
         let fix_path_btn = Button::builder()
@@ -597,7 +628,12 @@ pub fn build_ui(app: &Application, state: SharedState) -> ApplicationWindow {
             }
         });
         d_note_box.append(&fix_path_btn);
-        d_note_box.append(&Label::builder().use_markup(true).label("<span color='#f5c71a' weight='bold'>Note:</span> ~/.local/bin is not in your PATH. Click above to fix or add it manually to your .bashrc.").justify(gtk::Justification::Center).wrap(true).build());
+        d_note_box.append(&Label::builder()
+            .use_markup(true)
+            .label("<span color='#f5c71a' weight='bold'>Note:</span> ~/.local/bin is not in your PATH. Click above to fix or add it manually to your .bashrc.")
+            .justify(gtk::Justification::Center)
+            .wrap(true)
+            .build());
     }
 
     desktop_content.append(&d_note_box);
@@ -643,6 +679,7 @@ pub fn build_ui(app: &Application, state: SharedState) -> ApplicationWindow {
     let main_scrolled = gtk::ScrolledWindow::builder()
         .vexpand(true)
         .hscrollbar_policy(gtk::PolicyType::Never)
+        .min_content_height(100)
         .build();
     let main_scroll_content = GBox::new(Orientation::Vertical, 0);
     main_scrolled.set_child(Some(&main_scroll_content));
@@ -919,9 +956,9 @@ pub fn build_ui(app: &Application, state: SharedState) -> ApplicationWindow {
     };
 
     stack.add_named(&main_vbox, Some("main"));
-    stack.add_named(&compat_vbox, Some("compat"));
-    stack.add_named(&warning_vbox, Some("warning"));
-    stack.add_named(&desktop_vbox, Some("desktop"));
+    stack.add_named(&compat_scrolled, Some("compat"));
+    stack.add_named(&warning_scrolled, Some("warning"));
+    stack.add_named(&desktop_scrolled, Some("desktop"));
     root_vbox.append(&stack);
 
     let rc = refresh_compat.clone();

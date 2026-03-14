@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=ToTray
 Comment=Autorun and Tray Manager for Hyprland
-Exec=/home/agzes/.local/bin/totray
+Exec=totray
 Icon=totray
 Terminal=false
 Type=Application
@@ -11,4 +11,4 @@ Actions=Settings;
 
 [Desktop Action Settings]
 Name=Settings
-Exec=/home/agzes/.local/bin/totray
+Exec=totray

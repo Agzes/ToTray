@@ -31,7 +31,7 @@
 - **🪟 Workspace Rules**: Automatically move specific applications to designated workspaces on launch.
 - **🛠️ Flexible Actions**: Support for `Close`, `Close2` (double-close for apps with splash screens like discord), `Workspace`, and `HideToTray`.
 - **🖥️ GUI**: Configure everything through a modern GTK4 interface.
-- **🎛️ CLI**: Add rules via command line. `totray --help` (register app in GUI)
+- **🎛️ CLI**: Add rules via command line. `totray --help`
 - **🔔 Notifications**: Optional desktop notifications for background actions.
 - **📉 Low Overhead**: Written in Rust for maximum performance and minimal resource usage.
 
@@ -40,7 +40,7 @@
 ## <a name="installation"></a> 📥 Installation
 
 ### 📦 Binary Packages
-- **AppImage**: Download the latest version from the [Releases][Download] page. (run `chmod +x ToTray-v0.1.0.AppImage` and then `./ToTray-v0.1.0.AppImage --gui`and see [Usage](#usage))
+- **AppImage**: Download the latest version from the [Releases][Download] page. (run `chmod +x ToTray-v0.1.0.AppImage` and then `./ToTray-v0.1.0.AppImage` and see [Usage](#usage))
 - **AUR**: Coming soon!
 
 ### 🛠️ Manual Installation
@@ -51,11 +51,17 @@ If you prefer to build from source, follow the instructions in the [Build](#buil
 ## <a name="usage"></a> 🚀 Usage
 
 ### Starting ToTray
-To launch the settings GUI: (run this in the terminal opened in folder with totray)
+To launch the settings GUI:
 ```bash
-./totray --gui
+./totray
 ```
 Inside the GUI, click the **"Install Desktop File"** button to register the application and start using ToTray.
+
+### Background Mode
+To start ToTray in the background (worker mode, usually used for autostart):
+```bash
+./totray --worker
+```
 
 <br>
 
@@ -94,7 +100,7 @@ sudo apt install build-essential libgtk-4-dev pkg-config
 <br>
 
 ## <a name="cli-management"></a> 🛠️ CLI Management
-You can add rules directly from your terminal (don't forget to register the app in GUI first):
+You can add rules directly from your terminal:
 ```bash
 # Hide Firefox to tray on launch
 totray --add --name "firefox" --exec "firefox" --action "tray"
@@ -107,7 +113,7 @@ totray --add --name "vesktop" --exec "vesktop" --action "close2"
 ```
 
 ### Available CLI Arguments
-- `--gui`: Launch the settings GUI.
+- `--worker`: Start only the backend worker (no GUI).
 - `--add`: Add a new rule via CLI.
 - - `--name <CLASS>`: Window class name (find it via `hyprctl clients`).
 - - `--exec <CMD>`: Execution command for the application.

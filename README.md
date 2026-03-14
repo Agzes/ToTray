@@ -131,6 +131,17 @@ totray --add --name "vesktop" --exec "vesktop" --action "close2"
 
 <br>
 
+## 🗑️ Correct uninstall 
+### AppImage:
+1. Open ToTray and go to "Settings"
+2. Click "Uninstall (Remove all traces)"
+3. Remove the AppImage file.
+
+### AUR:
+1. Run `yay -Rns totray` or `paru -Rns totray`
+
+<br>
+
 ## ⚙️ How it Works
 ToTray monitors window events in Hyprland. When a window matching a defined **Window Class** appears, ToTray executes the assigned action.
 

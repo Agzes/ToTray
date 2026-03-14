@@ -190,58 +190,49 @@ fn main() -> glib::ExitCode {
         return glib::ExitCode::from(0);
     }
 
-    {
-        let s = state.lock().unwrap();
-        backend::autostart(s.auto_start);
-    }
+    let app = Application::builder().application_id(state::APP_ID).build();
+    let state_c = state.clone();
+    let is_worker = args.worker;
 
-    let silent = { state.lock().unwrap().silent_mode };
-
-    if args.worker {
-        println!("ToTray backend starting...");
-        backend::start_backend(state.clone());
+    app.connect_startup(move |_| {
+        println!("[ToTray] Initializing background services...");
+        
         let tray = ToTrayIcon {
-            state: state.clone(),
+            state: state_c.clone(),
         };
         let service = TrayService::new(tray);
         service.spawn();
+        println!("[ToTray] Tray icon spawned.");
 
-        if silent {
-            let state_ui = state.clone();
-            glib::timeout_add_local_once(std::time::Duration::from_millis(100), move || {
-                let app = Application::builder().application_id(state::APP_ID).build();
-                app.connect_activate(move |obj| {
-                    ui::build_ui(obj, state_ui.clone());
-                });
-                app.run_with_args::<&str>(&[]);
-            });
+        if is_worker {
+            println!("[ToTray] Worker mode: Starting rules engine...");
+            backend::start_backend(state_c.clone());
         }
+    });
 
-        println!("Tray icon active. Press Ctrl+C to stop.");
-        glib::MainLoop::new(None, false).run();
-        return glib::ExitCode::from(0);
-    }
-
-    println!("ToTray starting...");
-    backend::start_backend(state.clone());
-
-    let app = Application::builder().application_id(state::APP_ID).build();
     let state_ui = state.clone();
+    let is_worker_active = args.worker;
 
     app.connect_activate(move |obj| {
+        println!("[ToTray] Activation signal received.");
         if let Some(window) = obj.windows().first() {
+            println!("[ToTray] Presenting existing window.");
             window.present();
             return;
         }
 
-        ui::build_ui(obj, state_ui.clone());
-
-        let tray = ToTrayIcon {
-            state: state_ui.clone(),
-        };
-        let service = TrayService::new(tray);
-        service.spawn();
+        println!("[ToTray] Building new UI window.");
+        let window = ui::build_ui(obj, state_ui.clone());
+        
+        let is_silent = { state_ui.lock().unwrap().silent_mode };
+        if is_worker_active && is_silent {
+            println!("[ToTray] Silent mode enabled: keeping window hidden.");
+        } else {
+            println!("[ToTray] Showing window.");
+            window.present();
+        }
     });
 
+    println!("[ToTray] Entering main loop...");
     app.run_with_args::<&str>(&[])
 }

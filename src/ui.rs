@@ -243,7 +243,11 @@ fn create_rule_row(
             let s = state_run.lock().unwrap();
             (s.launch_delay, s.notifications)
         };
-        crate::backend::run_rule(&rule_run, delay, notify, &state_run);
+        let rule_c = rule_run.clone();
+        let state_c = state_run.clone();
+        std::thread::spawn(move || {
+            crate::backend::run_rule(&rule_c, delay, notify, &state_c);
+        });
     });
     main_hbox.append(&run_btn);
 
@@ -685,13 +689,30 @@ pub fn build_ui(app: &Application, state: SharedState) -> ApplicationWindow {
     main_scrolled.set_child(Some(&main_scroll_content));
     main_vbox.append(&main_scrolled);
 
-    main_scroll_content.append(
+    let rules_header = GBox::new(Orientation::Horizontal, 8);
+    rules_header.set_margin_bottom(8);
+    rules_header.append(
         &Label::builder()
             .label("Active Rules")
             .css_classes(["section-title"])
             .margin_start(4)
             .build(),
     );
+    let filler = GBox::new(Orientation::Horizontal, 0);
+    filler.set_hexpand(true);
+    rules_header.append(&filler);
+
+    let run_all_btn = Button::builder()
+        .label("Run All")
+        .css_classes(["version-btn"])
+        .valign(Align::Center)
+        .build();
+    let st_run_all = state.clone();
+    run_all_btn.connect_clicked(move |_| {
+        crate::backend::start_backend(st_run_all.clone());
+    });
+    rules_header.append(&run_all_btn);
+    main_scroll_content.append(&rules_header);
     let rules_list = ListBox::new();
     rules_list.add_css_class("card");
     rules_list.set_hexpand(true);
@@ -1390,6 +1411,22 @@ fn build_compat_ui(
         "Silent Mode",
         Some("Start hidden in background"),
         &silent_sw,
+        None,
+    ));
+
+    let multi_sw = Switch::new();
+    multi_sw.set_active(initial_state.multi_launch);
+    let st_c_multi = state.clone();
+    multi_sw.connect_state_set(move |_, state_val| {
+        let mut s = st_c_multi.lock().unwrap();
+        s.multi_launch = state_val;
+        s.save();
+        glib::Propagation::Proceed
+    });
+    settings_list.append(&create_row(
+        "Multi-Launch",
+        Some("Parallel programs startup"),
+        &multi_sw,
         None,
     ));
 

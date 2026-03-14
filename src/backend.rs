@@ -7,15 +7,28 @@ use std::thread;
 use std::time::Duration;
 
 pub fn start_backend(state: SharedState) {
-    let (apps, delay, notify) = {
+    let (apps, delay, notify, multi) = {
         let s = state.lock().unwrap();
-        (s.apps.clone(), s.launch_delay, s.notifications)
+        (
+            s.apps.clone(),
+            s.launch_delay,
+            s.notifications,
+            s.multi_launch,
+        )
     };
 
-    for app in apps {
-        let state_c = state.clone();
+    if multi {
+        for app in apps {
+            let state_c = state.clone();
+            thread::spawn(move || {
+                run_rule(&app, delay, notify, &state_c);
+            });
+        }
+    } else {
         thread::spawn(move || {
-            run_rule(&app, delay, notify, &state_c);
+            for app in apps {
+                run_rule(&app, delay, notify, &state.clone());
+            }
         });
     }
 }
@@ -45,8 +58,8 @@ pub fn run_rule(app: &AppRule, delay: u64, notify: bool, state: &SharedState) {
             return;
         }
 
-        if delay > 500 {
-            thread::sleep(Duration::from_millis(200));
+        if delay > 0 {
+            thread::sleep(Duration::from_millis(delay));
         }
     }
 

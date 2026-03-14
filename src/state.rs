@@ -26,6 +26,7 @@ pub struct AppState {
     pub launch_delay: u64,
     pub notifications: bool,
     pub auto_start: bool,
+    pub multi_launch: bool,
     pub silent_mode: bool,
 
     pub last_run_version: Option<String>,
@@ -45,6 +46,7 @@ impl Default for AppState {
             launch_delay: 1500,
             notifications: true,
             auto_start: false,
+            multi_launch: true,
             silent_mode: false,
             last_run_version: None,
             shown_warning: false,
@@ -115,6 +117,7 @@ mod tests {
         assert_eq!(state.launch_delay, 1500);
         assert!(state.notifications);
         assert!(!state.auto_start);
+        assert!(state.multi_launch);
     }
 
     #[test]

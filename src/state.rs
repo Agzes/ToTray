@@ -43,11 +43,11 @@ impl Default for AppState {
     fn default() -> Self {
         Self {
             apps: vec![],
-            launch_delay: 1500,
+            launch_delay: 0,
             notifications: true,
             auto_start: false,
             multi_launch: true,
-            silent_mode: false,
+            silent_mode: true,
             last_run_version: None,
             shown_warning: false,
             desktop_installed: false,
@@ -114,10 +114,11 @@ mod tests {
     fn test_default_state() {
         let state = AppState::default();
         assert_eq!(state.apps.len(), 0);
-        assert_eq!(state.launch_delay, 1500);
+        assert_eq!(state.launch_delay, 0);
         assert!(state.notifications);
         assert!(!state.auto_start);
         assert!(state.multi_launch);
+        assert!(state.silent_mode);
     }
 
     #[test]

@@ -41,7 +41,14 @@
 
 ### 📦 Binary Packages
 - **AppImage**: Download the latest version from the [Releases][Download] page. (run `chmod +x ToTray-v0.1.0.AppImage` and then `./ToTray-v0.1.0.AppImage` and see [Usage](#usage))
-- **AUR**: Coming soon!
+- **[AUR](https://aur.archlinux.org/packages/totray)**: 
+```bash
+yay -S totray
+``` 
+or 
+```bash
+paru -S totray 
+```
 
 ### 🛠️ Manual Installation
 If you prefer to build from source, follow the instructions in the [Build](#build) section.

@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.2.0] Systemd Release - 2026-09-22
 
 ### Added
 

@@ -8,7 +8,7 @@ use gtk::{
 };
 use std::process::Command;
 
-pub const CURRENT_VERSION: &str = "0.1.0";
+pub const CURRENT_VERSION: &str = "0.2.0";
 
 const CSS: &str = "
     .main-window { background-color: @window_bg_color; }

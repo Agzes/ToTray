@@ -8,7 +8,7 @@
 <kbd>❄️ Hyprland</kbd>
 
 <br><img src="assets/logo.png" width="128" alt="ToTray logo"/>
-<br><h1 align="center">&nbsp;&nbsp;&nbsp;&nbsp; $\Huge{\textsf{ToTray}}$ <sup><sup><kbd>v.0.1</kbd></sup></sup>
+<br><h1 align="center">&nbsp;&nbsp;&nbsp;&nbsp; $\Huge{\textsf{ToTray}}$ <sup><sup><kbd>v.0.2</kbd></sup></sup>
 <br></h1>
   <p><b>An automated application manager and tray utility for Hyprland.</b></p>
 
@@ -38,7 +38,7 @@
 
 ### 📦 Binary Packages
 
-- **AppImage**: Download the latest version from the [Releases][Download] page. (run `chmod +x ToTray-v0.1.0.AppImage` and then `./ToTray-v0.1.0.AppImage` and see [Usage](#usage))
+- **AppImage**: Download the latest version from the [Releases][Download] page. (run `chmod +x ToTray-v0.2.0.AppImage` and then `./ToTray-v0.2.0.AppImage` and see [Usage](#usage))
 - **[AUR](https://aur.archlinux.org/packages/totray)**:
 
 ```bash

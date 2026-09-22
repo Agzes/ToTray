@@ -1,67 +1,82 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+    push:
+        tags:
+            - "v*"
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: "Existing tag to rebuild (e.g. v0.2.0) - the release asset is replaced"
+                required: true
 
 jobs:
-  appimage:
-    name: Build AppImage
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
+    appimage:
+        name: Build AppImage
+        runs-on: ubuntu-24.04
+        permissions:
+            contents: write
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Determine version
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          version="${version#.}"
-          echo "VERSION=$version" >> "$GITHUB_ENV"
-          echo "ASSET_NAME=ToTray-v${version}.AppImage" >> "$GITHUB_ENV"
+            - name: Determine version
+              run: |
+                  ref="${{ github.event.inputs.tag || github.ref_name }}"
+                  version="${ref#v}"
+                  version="${version#.}"
+                  echo "TAG=$ref" >> "$GITHUB_ENV"
+                  echo "VERSION=$version" >> "$GITHUB_ENV"
+                  echo "ASSET_NAME=ToTray-v${version}.AppImage" >> "$GITHUB_ENV"
+                  echo "Tag: $ref | version: $version"
 
-      - name: Generate release notes
-        run: bash .github/scripts/release-notes.sh > release-notes.md
+            - name: Generate release notes
+              run: bash .github/scripts/release-notes.sh "$TAG" > release-notes.md
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libgtk-4-dev libdbus-1-dev desktop-file-utils squashfs-tools
+            - name: Install dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y build-essential pkg-config libgtk-4-dev libdbus-1-dev desktop-file-utils file wget
+                  sudo apt-get install -y libfuse2t64 || sudo apt-get install -y libfuse2 || true
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+            - name: Install appimagetool
+              run: |
+                  sudo curl -fsSL -o /usr/local/bin/appimagetool \
+                    https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+                  sudo chmod +x /usr/local/bin/appimagetool
 
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+            - name: Install Rust
+              uses: dtolnay/rust-toolchain@stable
 
-      - name: Build
-        run: cargo build --release
+            - name: Cache cargo
+              uses: Swatinem/rust-cache@v2
 
-      - name: Prepare AppDir
-        run: |
-          mkdir -p AppDir
-          cp target/release/totray AppDir/totray
-          cp totray.desktop AppDir/totray.desktop
-          cp assets/logo.png AppDir/totray.png
-          ln -s totray.png AppDir/.DirIcon
-          printf '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/totray" "$@"\n' > AppDir/AppRun
-          chmod +x AppDir/AppRun
+            - name: Install cargo-appimage
+              run: cargo install cargo-appimage
 
-      - name: Build AppImage
-        env:
-          ARCH: x86_64
-        run: |
-          curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool
-          ./appimagetool --appimage-extract-and-run AppDir "$ASSET_NAME"
+            - name: Build AppImage
+              env:
+                  APPIMAGE_EXTRACT_AND_RUN: "1"
+              run: cargo appimage
 
-      - name: Upload to release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: ToTray v${{ env.VERSION }}
-          body_path: release-notes.md
-          files: "*.AppImage"
-          fail_on_unmatched_files: true
+            - name: Collect artifact
+              run: |
+                  src=$(find . -name '*.AppImage' -not -path './.git/*' -not -name 'appimagetool*' | head -1)
+                  if [ -z "$src" ]; then
+                    echo "AppImage was not produced"
+                    exit 1
+                  fi
+                  mv "$src" "$ASSET_NAME"
+                  ls -lh "$ASSET_NAME"
+
+            - name: Publish release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  if gh release view "$TAG" >/dev/null 2>&1; then
+                    gh release edit "$TAG" --title "ToTray v${VERSION}" --notes-file release-notes.md
+                  else
+                    gh release create "$TAG" --verify-tag --title "ToTray v${VERSION}" --notes-file release-notes.md
+                  fi
+                  gh release upload "$TAG" "$ASSET_NAME" --clobber

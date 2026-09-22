@@ -5,7 +5,7 @@ cd "$(dirname "$0")/../.."
 
 changelog_version=$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | tr -d '[]# ' || true)
 
-tag_version="${GITHUB_REF_NAME:-}"
+tag_version="${1:-${GITHUB_REF_NAME:-}}"
 tag_version="${tag_version#v}"
 tag_version="${tag_version#.}"
 

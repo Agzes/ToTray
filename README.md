@@ -126,7 +126,9 @@ sudo apt install build-essential libgtk-4-dev pkg-config
 
 ### Releases
 
-Pushing a tag like `v0.2.0` triggers GitHub Actions, which builds the project and uploads `ToTray-v0.2.0.AppImage` to the release page.
+Pushing a tag like `v.0.2.0` triggers GitHub Actions, which builds the project with `cargo-appimage` (dependencies are bundled into the image) and uploads `ToTray-v0.2.0.AppImage` to the release page.
+
+To rebuild an existing release without moving the tag, run manually: **Actions -> Release -> Run workflow** and enter the tag (`v.0.2.0`) - the release asset and notes are replaced.
 
 <br>
 

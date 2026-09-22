@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  appimage:
+    name: Build AppImage
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          version="${version#.}"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "ASSET_NAME=ToTray-v${version}.AppImage" >> "$GITHUB_ENV"
+
+      - name: Generate release notes
+        run: bash .github/scripts/release-notes.sh > release-notes.md
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libgtk-4-dev desktop-file-utils squashfs-tools
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Prepare AppDir
+        run: |
+          mkdir -p AppDir
+          cp target/release/totray AppDir/totray
+          cp totray.desktop AppDir/totray.desktop
+          cp assets/logo.png AppDir/totray.png
+          ln -s totray.png AppDir/.DirIcon
+          printf '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/totray" "$@"\n' > AppDir/AppRun
+          chmod +x AppDir/AppRun
+
+      - name: Build AppImage
+        env:
+          ARCH: x86_64
+        run: |
+          curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          ./appimagetool --appimage-extract-and-run AppDir "$ASSET_NAME"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ToTray v${{ env.VERSION }}
+          body_path: release-notes.md
+          files: "*.AppImage"
+          fail_on_unmatched_files: true

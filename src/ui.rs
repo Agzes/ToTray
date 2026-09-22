@@ -1378,7 +1378,7 @@ fn build_compat_ui(
     });
     settings_list.append(&create_row(
         "Auto-Start",
-        Some("Launch with Hyprland"),
+        Some("Launch as a systemd user service"),
         &auto_sw,
         None,
     ));

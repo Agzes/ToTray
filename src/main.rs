@@ -101,10 +101,7 @@ impl Tray for ToTrayIcon {
         let mut menu = vec![
             MenuItem::Standard(StandardItem {
                 label: "Settings".into(),
-                activate: Box::new(|_| {
-                    let exe = std::env::current_exe().unwrap_or_else(|_| "totray".into());
-                    let _ = std::process::Command::new(exe).spawn();
-                }),
+                activate: Box::new(|_| open_settings()),
                 ..Default::default()
             }),
             MenuItem::Standard(StandardItem {
@@ -133,6 +130,44 @@ impl Tray for ToTrayIcon {
         }
 
         menu
+    }
+}
+
+fn open_settings() {
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    if !hypr::exec(&exe.to_string_lossy()) {
+        let _ = std::process::Command::new(exe).spawn();
+    }
+}
+
+fn run_worker(state: SharedState) -> glib::ExitCode {
+    println!("[ToTray] Worker mode: starting background services...");
+
+    let auto_start = { state.lock().unwrap().auto_start };
+    backend::migrate_legacy_autostart(auto_start);
+
+    if !hypr::wait_for_session(std::time::Duration::from_secs(120)) {
+        eprintln!("[ToTray] Hyprland is not ready, continuing anyway...");
+    }
+
+    let tray = ToTrayIcon {
+        state: state.clone(),
+    };
+    TrayService::new(tray).spawn();
+    println!("[ToTray] Tray icon spawned.");
+
+    let show_ui = !state.lock().unwrap().silent_mode;
+    if show_ui {
+        open_settings();
+    }
+
+    println!("[ToTray] Starting rules engine...");
+    backend::start_backend(state);
+
+    loop {
+        std::thread::park();
     }
 }
 
@@ -191,28 +226,23 @@ fn main() -> glib::ExitCode {
         return glib::ExitCode::from(0);
     }
 
+    if args.worker {
+        return run_worker(state);
+    }
+
     let app = Application::builder().application_id(state::APP_ID).build();
     let state_c = state.clone();
-    let is_worker = args.worker;
 
     app.connect_startup(move |_| {
-        println!("[ToTray] Initializing background services...");
-        
+        println!("[ToTray] Initializing tray...");
         let tray = ToTrayIcon {
             state: state_c.clone(),
         };
-        let service = TrayService::new(tray);
-        service.spawn();
+        TrayService::new(tray).spawn();
         println!("[ToTray] Tray icon spawned.");
-
-        if is_worker {
-            println!("[ToTray] Worker mode: Starting rules engine...");
-            backend::start_backend(state_c.clone());
-        }
     });
 
     let state_ui = state.clone();
-    let is_worker_active = args.worker;
 
     app.connect_activate(move |obj| {
         println!("[ToTray] Activation signal received.");
@@ -224,14 +254,8 @@ fn main() -> glib::ExitCode {
 
         println!("[ToTray] Building new UI window.");
         let window = ui::build_ui(obj, state_ui.clone());
-        
-        let is_silent = { state_ui.lock().unwrap().silent_mode };
-        if is_worker_active && is_silent {
-            println!("[ToTray] Silent mode enabled: keeping window hidden.");
-        } else {
-            println!("[ToTray] Showing window.");
-            window.present();
-        }
+        println!("[ToTray] Showing window.");
+        window.present();
     });
 
     println!("[ToTray] Entering main loop...");

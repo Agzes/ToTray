@@ -17,6 +17,11 @@ pub fn start_backend(state: SharedState) {
         )
     };
 
+    println!("[ToTray] {} rule(s) loaded.", apps.len());
+    if apps.is_empty() {
+        eprintln!("[ToTray] No rules configured, nothing to launch.");
+    }
+
     if multi {
         for app in apps {
             let state_c = state.clone();
@@ -34,15 +39,21 @@ pub fn start_backend(state: SharedState) {
 }
 
 pub fn run_rule(app: &AppRule, delay: u64, notify: bool, state: &SharedState) {
-    if notify {
-        let _ = Notification::new()
+    if notify
+        && let Err(e) = Notification::new()
             .summary("ToTray")
             .body(&format!("Launching {}", app.name))
             .icon("totray")
-            .show();
+            .show()
+    {
+        eprintln!("[ToTray] Notification failed: {}", e);
     }
 
-    launch_captured(app, state.clone());
+    println!("[ToTray] Launching {} ({})", app.name, app.exec);
+    if !hypr::exec(&app.exec) {
+        eprintln!("[ToTray] hyprctl exec failed, falling back to a direct spawn.");
+        launch_captured(app, state.clone());
+    }
 
     if app.action != Action::Close2 {
         let mut found = false;
@@ -69,6 +80,9 @@ pub fn run_rule(app: &AppRule, delay: u64, notify: bool, state: &SharedState) {
             let mut found = false;
             for _ in 0..40 {
                 if hypr::get_window_count(&app.name) > 0 {
+                    if delay > 0 {
+                        thread::sleep(Duration::from_millis(delay));
+                    }
                     hypr::close_window(&app.name);
                     found = true;
                     break;
@@ -109,72 +123,203 @@ pub fn launch_captured(app: &AppRule, state: SharedState) {
             .stderr(Stdio::piped())
             .spawn();
 
-        if let Ok(mut c) = child {
-            let stdout = c.stdout.take().unwrap();
-            let stderr = c.stderr.take().unwrap();
+        let mut c = match child {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("[ToTray] Failed to launch {}: {}", name, e);
+                return;
+            }
+        };
 
-            let st_out = state.clone();
-            let name_out = name.clone();
-            thread::spawn(move || {
-                let reader = BufReader::new(stdout);
-                for l in reader.lines().map_while(Result::ok) {
-                    let mut s = st_out.lock().unwrap();
-                    s.logs.entry(name_out.clone()).or_default().push(l);
-                    if s.logs.get(&name_out).unwrap().len() > 500 {
-                        s.logs.get_mut(&name_out).unwrap().remove(0);
-                    }
-                }
-            });
+        let stdout = c.stdout.take().unwrap();
+        let stderr = c.stderr.take().unwrap();
+        capture_output(stdout, state.clone(), name.clone(), "");
+        capture_output(stderr, state.clone(), name.clone(), "[ERR] ");
 
-            let st_err = state.clone();
-            let name_err = name.clone();
-            thread::spawn(move || {
-                let reader = BufReader::new(stderr);
-                for l in reader.lines().map_while(Result::ok) {
-                    let mut s = st_err.lock().unwrap();
-                    s.logs
-                        .entry(name_err.clone())
-                        .or_default()
-                        .push(format!("[ERR] {}", l));
-                    if s.logs.get(&name_err).unwrap().len() > 500 {
-                        s.logs.get_mut(&name_err).unwrap().remove(0);
-                    }
-                }
-            });
+        let _ = c.wait();
+    });
+}
 
-            let _ = c.wait();
+fn capture_output(
+    reader: impl std::io::Read + Send + 'static,
+    state: SharedState,
+    name: String,
+    prefix: &'static str,
+) {
+    thread::spawn(move || {
+        for line in BufReader::new(reader).lines().map_while(Result::ok) {
+            let mut s = state.lock().unwrap();
+            let entry = s.logs.entry(name.clone()).or_default();
+            entry.push(format!("{}{}", prefix, line));
+            if entry.len() > 500 {
+                entry.remove(0);
+            }
         }
     });
 }
 
-pub fn autostart(add: bool) {
-    if let Some(config_dir) = dirs::config_dir() {
-        let hypr_conf = config_dir.join("hypr/hyprland.conf");
-        if let Ok(content) = std::fs::read_to_string(&hypr_conf) {
-            let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
-            lines.retain(|l| !l.contains("totray") && !l.contains("# ToTray:"));
-            while lines.last().map(|l| l.trim().is_empty()).unwrap_or(false) {
-                lines.pop();
-            }
-            if add {
-                let mut bin_path = dirs::home_dir()
-                    .map(|h| h.join(".local/bin/totray"))
-                    .unwrap_or_else(|| std::path::PathBuf::from("totray"));
-                if !bin_path.exists()
-                    && let Ok(current) = std::env::current_exe()
-                {
-                    bin_path = current;
-                }
-                lines.push("".to_string());
-                lines.push("# ToTray: Autorun manager for Hyprland".to_string());
-                lines.push(format!("exec-once = {} --worker", bin_path.display()));
-            }
-            let new_content = lines.join("\n") + "\n";
-            if content != new_content {
-                let _ = std::fs::write(&hypr_conf, new_content);
-            }
+const SERVICE_NAME: &str = "totray.service";
+
+fn service_unit_path() -> Option<std::path::PathBuf> {
+    let mut dir = dirs::config_dir()?;
+    dir.push("systemd/user");
+    let _ = std::fs::create_dir_all(&dir);
+    Some(dir.join(SERVICE_NAME))
+}
+
+fn install_self(target: &std::path::Path) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let tmp = target.with_extension("tmp");
+    std::fs::copy("/proc/self/exe", &tmp)?;
+    std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755))?;
+    std::fs::rename(&tmp, target)?;
+    Ok(())
+}
+
+fn clean_current_exe() -> Option<std::path::PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let raw = exe.to_string_lossy().into_owned();
+    let path = match raw.strip_suffix(" (deleted)") {
+        Some(stripped) => std::path::PathBuf::from(stripped),
+        None => exe,
+    };
+    path.exists().then_some(path)
+}
+
+fn resolve_bin() -> Option<std::path::PathBuf> {
+    let local = dirs::home_dir()?.join(".local/bin/totray");
+    if local.exists() {
+        return Some(local);
+    }
+    if install_self(&local).is_ok() {
+        return Some(local);
+    }
+    clean_current_exe()
+}
+
+fn systemctl(args: &[&str]) -> bool {
+    match Command::new("systemctl").args(args).status() {
+        Ok(status) => status.success(),
+        Err(e) => {
+            eprintln!("[ToTray] Failed to run systemctl: {}", e);
+            false
         }
     }
+}
+
+fn service_enabled() -> bool {
+    Command::new("systemctl")
+        .args(["--user", "--quiet", "is-enabled", SERVICE_NAME])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+pub fn autostart(add: bool) {
+    remove_hyprland_autostart();
+
+    let Some(path) = service_unit_path() else {
+        eprintln!("[ToTray] Cannot resolve systemd user unit directory.");
+        return;
+    };
+
+    if add {
+        if !enable_service(true) {
+            eprintln!("[ToTray] Failed to enable systemd user service.");
+        }
+    } else {
+        let _ = systemctl(&["--user", "disable", "--now", SERVICE_NAME]);
+        if path.exists() {
+            let _ = std::fs::remove_file(&path);
+        }
+        let _ = systemctl(&["--user", "daemon-reload"]);
+    }
+}
+
+pub fn migrate_legacy_autostart(auto_start: bool) {
+    let had_legacy = remove_hyprland_autostart();
+    if !auto_start || !had_legacy || service_enabled() {
+        return;
+    }
+    if enable_service(false) {
+        println!(
+            "[ToTray] Autostart migrated to systemd user service \
+             (active from the next login)."
+        );
+    }
+}
+
+fn enable_service(start_now: bool) -> bool {
+    if !write_service_unit() {
+        return false;
+    }
+    if !systemctl(&["--user", "daemon-reload"]) {
+        return false;
+    }
+    if start_now {
+        systemctl(&["--user", "enable", "--now", SERVICE_NAME])
+    } else {
+        systemctl(&["--user", "enable", SERVICE_NAME])
+    }
+}
+
+fn write_service_unit() -> bool {
+    let Some(path) = service_unit_path() else {
+        return false;
+    };
+    let Some(bin) = resolve_bin() else {
+        eprintln!("[ToTray] Could not resolve the totray binary path.");
+        return false;
+    };
+    let content = format!(
+        "[Unit]\n\
+         Description=ToTray - Autorun and Tray Manager for Hyprland\n\
+         After=graphical-session.target\n\
+         PartOf=graphical-session.target\n\
+         \n\
+         [Service]\n\
+         Type=simple\n\
+         ExecStart=\"{}\" --worker\n\
+         Restart=on-failure\n\
+         RestartSec=3\n\
+         \n\
+         [Install]\n\
+         WantedBy=default.target\n",
+        bin.display()
+    );
+    match std::fs::write(&path, content) {
+        Ok(()) => true,
+        Err(e) => {
+            eprintln!("[ToTray] Failed to write {}: {}", path.display(), e);
+            false
+        }
+    }
+}
+
+fn remove_hyprland_autostart() -> bool {
+    let Some(config_dir) = dirs::config_dir() else {
+        return false;
+    };
+    let hypr_conf = config_dir.join("hypr/hyprland.conf");
+    let Ok(content) = std::fs::read_to_string(&hypr_conf) else {
+        return false;
+    };
+
+    let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+    lines.retain(|l| !l.contains("totray") && !l.contains("# ToTray:"));
+    while lines.last().map(|l| l.trim().is_empty()).unwrap_or(false) {
+        lines.pop();
+    }
+    let new_content = lines.join("\n") + "\n";
+
+    if content == new_content {
+        return false;
+    }
+    let _ = std::fs::write(&hypr_conf, new_content);
+    true
 }
 
 pub fn desktop_file_exists() -> bool {
@@ -228,49 +373,17 @@ pub fn setup_desktop_file() -> bool {
         }
         let target_bin = bin_dir.join("totray");
 
-        if let Ok(current_exe) = std::env::current_exe() {
-            if target_bin.exists() {
-                let _ = std::fs::remove_file(&target_bin);
+        match install_self(&target_bin) {
+            Ok(()) => {
+                println!("Successfully installed binary to {}", target_bin.display());
             }
-
-            match std::fs::copy(&current_exe, &target_bin) {
-                Ok(_) => {
-                    #[cfg(unix)]
-                    {
-                        use std::os::unix::fs::PermissionsExt;
-                        let _ = std::fs::set_permissions(
-                            &target_bin,
-                            std::fs::Permissions::from_mode(0o755),
-                        );
-                    }
-                    println!("Successfully installed binary to {}", target_bin.display());
-                }
-                Err(e) => {
-                    eprintln!(
-                        "Failed to copy binary from {} to {}: {}",
-                        current_exe.display(),
-                        target_bin.display(),
-                        e
-                    );
-                    if let Ok(bytes) = std::fs::read(&current_exe) {
-                        if let Err(e2) = std::fs::write(&target_bin, bytes) {
-                            eprintln!("Fallback write also failed: {}", e2);
-                        } else {
-                            #[cfg(unix)]
-                            {
-                                use std::os::unix::fs::PermissionsExt;
-                                let _ = std::fs::set_permissions(
-                                    &target_bin,
-                                    std::fs::Permissions::from_mode(0o755),
-                                );
-                            }
-                            println!("Fallback installation successful.");
-                        }
-                    }
-                }
+            Err(e) => {
+                eprintln!(
+                    "Failed to install binary to {}: {}",
+                    target_bin.display(),
+                    e
+                );
             }
-        } else {
-            eprintln!("Could not determine current executable path");
         }
 
         let apps_dir = data.join("applications");
@@ -397,35 +510,18 @@ pub fn add_to_path_config() -> bool {
 }
 
 pub fn sync_binary() {
-    let current_exe = match std::env::current_exe() {
-        Ok(exe) => exe,
-        Err(_) => return,
+    let Some(home) = dirs::home_dir() else {
+        return;
     };
-
-    let home = match dirs::home_dir() {
-        Some(h) => h,
-        None => return,
-    };
-
     let target_bin = home.join(".local/bin/totray");
 
-    if current_exe == target_bin {
+    if files_match(std::path::Path::new("/proc/self/exe"), &target_bin) {
         return;
     }
 
-    if target_bin.exists() {
-        if !files_match(&current_exe, &target_bin) {
-            println!("[ToTray] Updating binary in .local/bin...");
-            let _ = std::fs::copy(&current_exe, &target_bin);
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(
-                    &target_bin,
-                    std::fs::Permissions::from_mode(0o755),
-                );
-            }
-        }
+    println!("[ToTray] Updating binary in .local/bin...");
+    if let Err(e) = install_self(&target_bin) {
+        eprintln!("[ToTray] Failed to update binary: {}", e);
     }
 }
 
@@ -442,10 +538,10 @@ fn files_match(p1: &std::path::Path, p2: &std::path::Path) -> bool {
     let m1 = f1.metadata().ok();
     let m2 = f2.metadata().ok();
 
-    if let (Some(m1), Some(m2)) = (m1, m2) {
-        if m1.len() != m2.len() {
-            return false;
-        }
+    if let (Some(m1), Some(m2)) = (m1, m2)
+        && m1.len() != m2.len()
+    {
+        return false;
     }
 
     use std::io::Read;

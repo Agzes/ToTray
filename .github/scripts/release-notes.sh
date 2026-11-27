@@ -22,7 +22,7 @@ fi
 section=$(awk -v ver="$changelog_version" '
   $0 ~ "^## \\[" ver "\\]" { found = 1 }
   found && /^## / && $0 !~ "^## \\[" ver "\\]" { found = 0 }
-  found { print }
+  found && $0 !~ /^---$/ { print }
 ' CHANGELOG.md)
 
 if [ -z "$section" ]; then
@@ -30,19 +30,27 @@ if [ -z "$section" ]; then
   exit 1
 fi
 
-short="v.$(echo "$changelog_version" | cut -d. -f1,2)"
-
 cat <<EOF
 <div align="center">
-  <br><img src="https://raw.githubusercontent.com/Agzes/ToTray/refs/heads/main/assets/logo.png" width="128" alt="ToTray logo"/>
-  <br><h1 align="center">&nbsp;&nbsp;&nbsp;&nbsp; \$\Huge{\textsf{ToTray}}\$ <sup><sup><kbd>${short}</kbd></sup></sup>
-  <br></h1>
-  <p><b>An automated application manager and tray utility for Hyprland.</b></p>
+  <p>
+    <a href="https://aur.archlinux.org/packages/totray"><kbd>AUR package</kbd></a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/Agzes/ToTray#-build-from-source"><kbd>Build from source</kbd></a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/Agzes/ToTray/issues/new?template=bug_report.md"><kbd>Report a bug</kbd></a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/Agzes/ToTray/issues/new?template=feature_request.md"><kbd>Request a feature</kbd></a>
+  </p>
+  <h1><img height="24" alt="ToTray logo" src="https://raw.githubusercontent.com/Agzes/ToTray/refs/heads/main/assets/logo.png"/> ToTray <sup><kbd>v.${changelog_version}</kbd></sup></h1>
+  <p>An automated application manager and tray utility for Hyprland.</p>
 </div>
+
+---
 
 ${section}
 
-<h2></h2>
+---
+
 <kbd>With</kbd> <kbd>❤️</kbd> <kbd>by</kbd> <kbd>Agzes</kbd><br>
 <kbd>pls ⭐ project!</kbd>
 EOF

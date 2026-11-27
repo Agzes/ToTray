@@ -7,76 +7,181 @@ on:
     workflow_dispatch:
         inputs:
             tag:
-                description: "Existing tag to rebuild (e.g. v0.2.0) - the release asset is replaced"
+                description: "Release tag (e.g. v.1.0.0)"
                 required: true
+                type: string
+
+permissions:
+    contents: write
+
+concurrency:
+    group: release-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: false
+
+env:
+    CARGO_TERM_COLOR: always
+    CARGO_INCREMENTAL: 0
 
 jobs:
-    appimage:
-        name: Build AppImage
-        runs-on: ubuntu-24.04
-        permissions:
-            contents: write
+    build:
+        name: Build (${{ matrix.name }})
+        runs-on: ${{ matrix.os }}
+
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - name: linux
+                      os: ubuntu-latest
+                      artifact-name: ToTray-linux
 
         steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+            - uses: actions/checkout@v4
 
-            - name: Determine version
-              run: |
-                  ref="${{ github.event.inputs.tag || github.ref_name }}"
-                  version="${ref#v}"
-                  version="${version#.}"
-                  echo "TAG=$ref" >> "$GITHUB_ENV"
-                  echo "VERSION=$version" >> "$GITHUB_ENV"
-                  echo "ASSET_NAME=ToTray-v${version}.AppImage" >> "$GITHUB_ENV"
-                  echo "Tag: $ref | version: $version"
-
-            - name: Generate release notes
-              run: bash .github/scripts/release-notes.sh "$TAG" > release-notes.md
-
-            - name: Install dependencies
+            - name: Install Linux build dependencies
               run: |
                   sudo apt-get update
-                  sudo apt-get install -y build-essential pkg-config libxkbcommon-dev libdbus-1-dev desktop-file-utils file wget
-                  sudo apt-get install -y libfuse2t64 || sudo apt-get install -y libfuse2 || true
+                  sudo apt-get install -y --no-install-recommends \
+                    build-essential \
+                    pkg-config \
+                    libxkbcommon-dev \
+                    libdbus-1-dev \
+                    libfuse2 \
+                    desktop-file-utils \
+                    wget \
+                    file
+
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: clippy, rustfmt
+
+            - name: Rust format check
+              run: cargo fmt --all -- --check
+
+            - name: Rust clippy
+              run: cargo clippy --all-targets --locked -- -D warnings
+
+            - name: Rust tests
+              run: cargo test --locked
+
+            - name: Install packaging tools
+              uses: taiki-e/install-action@v2
+              with:
+                  tool: cargo-deb,cargo-generate-rpm,cargo-appimage
 
             - name: Install appimagetool
               run: |
-                  sudo curl -fsSL -o /usr/local/bin/appimagetool \
-                    https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+                  sudo wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /usr/local/bin/appimagetool
                   sudo chmod +x /usr/local/bin/appimagetool
+                  sudo sed -i 's|AI\x02|\x00\x00\x00|' /usr/local/bin/appimagetool
 
-            - name: Install Rust
-              uses: dtolnay/rust-toolchain@stable
-
-            - name: Cache cargo
-              uses: Swatinem/rust-cache@v2
-
-            - name: Install cargo-appimage
-              run: cargo install cargo-appimage
+            - name: Build release binary
+              run: cargo build --release --locked
 
             - name: Build AppImage
               env:
                   APPIMAGE_EXTRACT_AND_RUN: "1"
               run: cargo appimage
 
-            - name: Collect artifact
-              run: |
-                  src=$(find . -name '*.AppImage' -not -path './.git/*' -not -name 'appimagetool*' | head -1)
-                  if [ -z "$src" ]; then
-                    echo "AppImage was not produced"
-                    exit 1
-                  fi
-                  mv "$src" "$ASSET_NAME"
-                  ls -lh "$ASSET_NAME"
+            - name: Build Debian package
+              run: cargo deb --no-build
 
-            - name: Publish release
-              env:
-                  GH_TOKEN: ${{ github.token }}
+            - name: Build RPM package
+              run: cargo generate-rpm
+
+            - name: Upload build output
+              uses: actions/upload-artifact@v4
+              with:
+                  name: ${{ matrix.artifact-name }}
+                  if-no-files-found: error
+                  path: |
+                      target/release/totray
+                      target/appimage/*.AppImage
+                      *.AppImage
+                      target/debian/*.deb
+                      target/generate-rpm/*.rpm
+
+    publish:
+        name: Publish GitHub Release
+        runs-on: ubuntu-latest
+        needs: build
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Download build artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  path: release-downloads
+
+            - name: Prepare release body and assets
+              id: release_meta
+              shell: pwsh
               run: |
-                  if gh release view "$TAG" >/dev/null 2>&1; then
-                    gh release edit "$TAG" --title "ToTray v${VERSION}" --notes-file release-notes.md
-                  else
-                    gh release create "$TAG" --verify-tag --title "ToTray v${VERSION}" --notes-file release-notes.md
-                  fi
-                  gh release upload "$TAG" "$ASSET_NAME" --clobber
+                  $tag = "${{ github.ref_name }}"
+                  if ($tag -notmatch '^v') {
+                    $tag = "${{ inputs.tag }}"
+                  }
+                  $assetVersion = $tag -replace '^v\.?', ''
+                  "tag=$tag" >> $env:GITHUB_OUTPUT
+                  "name=$tag $([char]0x2022) ToTray" >> $env:GITHUB_OUTPUT
+
+                  bash .github/scripts/release-notes.sh "$tag" | Set-Content -Path release-body.md -Encoding UTF8
+
+                  New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+
+                  $appimage = Get-ChildItem release-downloads -Recurse -File | Where-Object { $_.Name -match '\.AppImage$' } | Select-Object -First 1
+                  if (-not $appimage) {
+                    throw "AppImage artifact was not found in release-downloads!"
+                  }
+                  Copy-Item $appimage.FullName -Destination (Join-Path "release-assets" "ToTray-$assetVersion-x86_64.AppImage")
+
+                  $deb = Get-ChildItem release-downloads -Recurse -File | Where-Object { $_.Name -match '\.deb$' } | Select-Object -First 1
+                  if (-not $deb) {
+                    throw "Debian (.deb) package was not found in release-downloads!"
+                  }
+                  Copy-Item $deb.FullName -Destination (Join-Path "release-assets" "ToTray-$assetVersion-linux-x64.deb")
+
+                  $rpm = Get-ChildItem release-downloads -Recurse -File | Where-Object { $_.Name -match '\.rpm$' } | Select-Object -First 1
+                  if (-not $rpm) {
+                    throw "RPM (.rpm) package was not found in release-downloads!"
+                  }
+                  Copy-Item $rpm.FullName -Destination (Join-Path "release-assets" "ToTray-$assetVersion-linux-x64.rpm")
+
+                  $binary = Get-ChildItem release-downloads -Recurse -File | Where-Object { $_.Name -eq "totray" } | Select-Object -First 1
+                  if (-not $binary) {
+                    throw "Standalone binary was not found in release-downloads!"
+                  }
+                  Copy-Item $binary.FullName -Destination (Join-Path "release-assets" "ToTray-$assetVersion-x86_64-linux")
+
+                  $assetOrder = @(
+                    "ToTray-$assetVersion-x86_64.AppImage",
+                    "ToTray-$assetVersion-linux-x64.deb",
+                    "ToTray-$assetVersion-linux-x64.rpm",
+                    "ToTray-$assetVersion-x86_64-linux"
+                  )
+
+                  $assetOrder |
+                    Where-Object { Test-Path (Join-Path "release-assets" $_) } |
+                    ForEach-Object {
+                      $filePath = Join-Path "release-assets" $_
+                      $hash = (Get-FileHash $filePath -Algorithm SHA256).Hash.ToLowerInvariant()
+                      "$hash  $_"
+                    } |
+                    Set-Content -Path release-assets/SHA256SUMS.txt -Encoding ASCII
+
+                  "files<<EOF" >> $env:GITHUB_OUTPUT
+                  $assetOrder |
+                    Where-Object { Test-Path (Join-Path "release-assets" $_) } |
+                    ForEach-Object { "release-assets/$_" >> $env:GITHUB_OUTPUT }
+                  "release-assets/SHA256SUMS.txt" >> $env:GITHUB_OUTPUT
+                  "EOF" >> $env:GITHUB_OUTPUT
+
+            - name: Create or Update GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ steps.release_meta.outputs.tag }}
+                  name: ${{ steps.release_meta.outputs.name }}
+                  body_path: release-body.md
+                  prerelease: false
+                  files: ${{ steps.release_meta.outputs.files }}

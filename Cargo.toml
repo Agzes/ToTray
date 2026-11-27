@@ -36,3 +36,43 @@ icon = "assets/logo.png"
 desktop_entry = "totray.desktop"
 auto_link = true
 category = "Utility"
+
+[package.metadata.deb]
+name = "totray"
+maintainer = "agzes <agzes0@proton.me>"
+copyright = "2026, agzes"
+license-file = ["LICENSE"]
+extended-description = "AutoRun and Tray Manager for Hyprland"
+depends = "$auto"
+section = "utils"
+priority = "optional"
+assets = [
+    [
+        "target/release/totray",
+        "usr/bin/totray",
+        "755",
+    ],
+    [
+        "totray.desktop",
+        "usr/share/applications/totray.desktop",
+        "644",
+    ],
+    [
+        "assets/logo.png",
+        "usr/share/icons/hicolor/256x256/apps/totray.png",
+        "644",
+    ],
+    [
+        "assets/logo.png",
+        "usr/share/pixmaps/totray.png",
+        "644",
+    ],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/totray", dest = "/usr/bin/totray", mode = "755" },
+    { source = "totray.desktop", dest = "/usr/share/applications/totray.desktop", mode = "644" },
+    { source = "assets/logo.png", dest = "/usr/share/icons/hicolor/256x256/apps/totray.png", mode = "644" },
+    { source = "assets/logo.png", dest = "/usr/share/pixmaps/totray.png", mode = "644" },
+]

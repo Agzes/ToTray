@@ -1,45 +1,46 @@
 <div align="center">
-  <kbd>⚠️ The utility is under development and may contain errors. ⚠️</kbd>
-  <br>
+  <kbd>🦀 Rust</kbd>
+  <kbd>🧊 iced</kbd>
+  <kbd>📂 Open-Source</kbd>
+  <kbd>❄️ Hyprland</kbd>
 
-<kbd>🦀 Rust</kbd>
-<kbd>🪶 GTK4</kbd>
-<kbd>📂 Open-Source</kbd>
-<kbd>❄️ Hyprland</kbd>
-
-<br><img src="assets/logo.png" width="128" alt="ToTray logo"/>
-<br><h1 align="center">&nbsp;&nbsp;&nbsp;&nbsp; $\Huge{\textsf{ToTray}}$ <sup><sup><kbd>v.0.2</kbd></sup></sup>
-<br></h1>
+<br><br><img src="assets/logo.png" width="128" alt="ToTray logo"/>
+  <h1>ToTray <sup><kbd>v.1.0.0</kbd></sup></h1>
   <p><b>An automated application manager and tray utility for Hyprland.</b></p>
 
-**[<kbd> <br> Installation <br> </kbd>][Installation]** 
-**[<kbd> <br> Build <br> </kbd>][Build]** 
-**[<kbd> <br> Usage <br> </kbd>][Usage]** 
-**[<kbd> <br> CLI (limited) <br> </kbd>][CLI]** 
-
-  <h2></h2>
-
+  <p>
+    <a href="https://github.com/Agzes/totray/releases"><kbd>Latest release</kbd></a>
+    &nbsp;·&nbsp;
+    <a href="https://aur.archlinux.org/packages/totray"><kbd>AUR package</kbd></a>
+    &nbsp;·&nbsp;
+    <a href="#-build-from-source"><kbd>Build from source</kbd></a>
+    &nbsp;·&nbsp;
+    <a href="#-cli"><kbd>CLI</kbd></a>
+  </p>
 </div>
 
-## ✨ Key Features
+## > Features
 
-- **🚀 Auto-Start Manager**: Manage and delay application startup to ensure a smooth desktop experience.
-- **📥 Hide to Tray**: Minimize any application to a ToTray tray icon, keeping your workspace clean.
-- **🪟 Workspace Rules**: Automatically move specific applications to designated workspaces on launch.
-- **🛠️ Flexible Actions**: Support for `Close`, `Close2` (double-close for apps with splash screens like discord), `Workspace`, and `HideToTray`.
-- **🖥️ GUI**: Configure everything through a modern GTK4 interface.
-- **🎛️ CLI**: Add rules via command line. `totray --help`
-- **🔔 Notifications**: Optional desktop notifications for background actions.
-- **📉 Low Overhead**: Written in Rust for maximum performance and minimal resource usage.
+- **Auto-Start Manager** - launches configured applications via a `systemd --user` service with optional startup delay and parallel or sequential execution.
+- **Window Actions** - supports `To Tray`, `Close`, `Close X times` (configurable repeat count for splash screens like Discord/Vesktop/Steam), `Workspace`, `Special WS` (e.g. `special:shelf`), `Float`, `Fullscreen`, and `Launch Only`.
+- **Tray Integration** - StatusNotifierItem tray (`ksni`) with quick restore for applications hidden to the `special` workspace.
+- **Single-Instance IPC** - opening `totray` while the background daemon is active brings up the existing window instead of spawning duplicate tray icons.
+- **Console Logs** - captures `stdout`/`stderr` output per rule directly inside the UI.
+- **Native `iced` UI** - GPU-accelerated interface with dark/light theme support and optional GTK theme color synchronization.
+- **CLI** - manage rules, desktop integration, and JSON output from the terminal (`totray --help`).
 
-<br>
+## > Installation
 
-## <a name="installation"></a> 📥 Installation
+### AppImage
 
-### 📦 Binary Packages
+Download the latest AppImage from the [Releases page](https://github.com/Agzes/totray/releases), make it executable, and run it:
 
-- **AppImage**: Download the latest version from the [Releases][Download] page. (run `chmod +x ToTray-v0.2.0.AppImage` and then `./ToTray-v0.2.0.AppImage` and see [Usage](#usage))
-- **[AUR](https://aur.archlinux.org/packages/totray)**:
+```bash
+chmod +x ToTray-v1.0.0.AppImage
+./ToTray-v1.0.0.AppImage
+```
+
+### Arch Linux (AUR)
 
 ```bash
 yay -S totray
@@ -51,30 +52,31 @@ or
 paru -S totray
 ```
 
-### 🛠️ Manual Installation
+## > Usage
 
-If you prefer to build from source, follow the instructions in the [Build](#build) section.
+### Desktop Integration & First Run
 
-<br>
-
-## <a name="usage"></a> 🚀 Usage
-
-### Starting ToTray
-
-To launch the settings GUI:
+Launch the GUI:
 
 ```bash
 ./totray
 ```
 
-Inside the GUI, click the **"Install Desktop File"** button to register the application and start using ToTray.
+On first launch, click **Add to System** (or run `./totray --install`) to install:
+
+- Binary: `~/.local/bin/totray`
+- Desktop entry: `~/.local/share/applications/totray.desktop`
+- Icon: `~/.local/share/icons/hicolor/256x256/apps/totray.png`
+
+Use `--tray` to start with the window hidden in the system tray.
 
 ### Background Mode (systemd service)
 
-ToTray's worker runs as a **systemd user service** (`totray.service`) instead of being started via `exec-once` in `hyprland.conf`.
+ToTray runs its background worker as a `systemd --user` service (`totray.service`) rather than `exec-once` in `hyprland.conf`.
 
-- Toggle **Auto-Start** in the GUI to install/enable the service. The unit file is written to `~/.config/systemd/user/totray.service` automatically.
-- Manage it manually if you prefer:
+- Toggle **Auto-Start** in **Settings** to install and enable `~/.config/systemd/user/totray.service`.
+- Legacy `exec-once = ... totray` entries in `hyprland.conf` are automatically cleaned up and migrated.
+- Manage the service manually if needed:
 
 ```bash
 systemctl --user status totray
@@ -82,59 +84,24 @@ systemctl --user restart totray
 journalctl --user -u totray -f
 ```
 
-- Legacy `exec-once = ... totray` entries in `hyprland.conf` are removed automatically and migrated to the service.
-- `./totray --worker` still runs the worker directly in the foreground (useful for diagnostics).
+## > Build from source
 
-<br>
+Requires Rust, `pkg-config`, `libdbus`, `libxkbcommon`, and Vulkan/Wayland/X11 development headers.
 
-## <a name="build"></a> 📦 Build
-
-### Prerequisites
-
-You will need **Rust** and **GTK4** development headers installed on your system.
-
-#### Arch Linux
+- **Arch Linux**: `sudo pacman -S --needed base-devel pkg-config dbus libxkbcommon`
+- **Debian / Ubuntu**: `sudo apt install build-essential pkg-config libdbus-1-dev libxkbcommon-dev`
+- **Fedora**: `sudo dnf install gcc pkg-config dbus-devel libxkbcommon-devel`
 
 ```bash
-sudo pacman -S --needed base-devel gtk4 pkg-config
+git clone https://github.com/Agzes/totray.git
+cd totray
+cargo build --release
+./target/release/totray
 ```
 
-#### Fedora
+## > CLI
 
-```bash
-sudo dnf install gtk4-devel gcc pkg-config
-```
-
-#### Ubuntu/Debian
-
-```bash
-sudo apt install build-essential libgtk-4-dev pkg-config
-```
-
-### Building from Source
-
-1. Clone the repository:
-    ```bash
-    git clone https://github.com/Agzes/totray.git
-    cd totray
-    ```
-2. Build the release version:
-    ```bash
-    cargo build --release
-    ```
-3. The binary will be available at `target/release/totray`.
-
-### Releases
-
-Pushing a tag like `v.0.2.0` triggers GitHub Actions, which builds the project with `cargo-appimage` (dependencies are bundled into the image) and uploads `ToTray-v0.2.0.AppImage` to the release page.
-
-To rebuild an existing release without moving the tag, run manually: **Actions -> Release -> Run workflow** and enter the tag (`v.0.2.0`) - the release asset and notes are replaced.
-
-<br>
-
-## <a name="cli-management"></a> 🛠️ CLI Management
-
-You can add rules directly from your terminal:
+Add rules directly from your terminal:
 
 ```bash
 # Hide Firefox to tray on launch
@@ -143,57 +110,40 @@ totray --add --name "firefox" --exec "firefox" --action "tray"
 # Move Spotify to workspace 11
 totray --add --name "spotify" --exec "spotify" --action "workspace" --workspace 11
 
-# Close vesktop (double close to close splash and main window)
-totray --add --name "vesktop" --exec "vesktop" --action "close2"
+# Close Vesktop 2 times (splash + main window)
+totray --add --name "vesktop" --exec "vesktop" --action "closetimes" --count 2
 ```
 
-### Available CLI Arguments
+### Flags
 
-- `--worker`: Start only the backend worker (no GUI).
-- `--add`: Add a new rule via CLI.
--   - `--name <CLASS>`: Window class name (find it via `hyprctl clients`).
--   - `--exec <CMD>`: Execution command for the application.
--   - `--action <ACTION>`: Action to perform (`close`, `close2`, `workspace`, `tray`).
--   - `--workspace <N>`: Target workspace number (required for `workspace` action).
+- `-w, --worker`: Start background worker (waits for Hyprland and runs rules).
+- `-t, --tray`: Start minimized in the system tray.
+- `--add`: Add a new rule via CLI (`--name`, `--exec`, `--action`, `--count`, `--workspace`, `--special`).
+    - Actions: `tray`, `close`, `close2`, `closetimes`, `workspace`, `special`, `float`, `fullscreen`, `launch`.
+- `--install`: Install desktop entry, icon, and binary to `~/.local/bin`.
+- `--uninstall`: Remove desktop entry, icons, and binary.
+- `--purge`: Remove all configuration files, systemd service, and desktop entries.
 - `--config-json`: Print active rules in JSON format.
 - `--version-json`: Print version info in JSON format.
 
-<br>
+## > Uninstall & Data Cleanup
 
-## 🗑️ Correct uninstall
+- **Via UI**: Open **Settings -> Purge All Data & Traces -> Purge & Exit**.
+- **Via CLI**:
 
-### AppImage:
+```bash
+totray --purge
+```
 
-1. Open ToTray and go to "Settings"
-2. Click "Uninstall (Remove all traces)"
-3. Remove the AppImage file.
+For AUR installations, remove the package afterwards with `yay -Rns totray` or `paru -Rns totray`.
 
-### AUR:
-
-1. Run `yay -Rns totray` or `paru -Rns totray`
-
-<br>
-
-## ⚙️ How it Works
-
-ToTray monitors window events in Hyprland. When a window matching a defined **Window Class** appears, ToTray executes the assigned action.
-
-- **HideToTray**: Moves the window to a `special` workspace. The tray icon allows you to bring it back to your active workspace.
-- **Auto-Start**: Runs as a systemd user service (`totray.service`) and launches the commands defined in your rules with an optional global delay.
-
-<br>
-
-## 📄 License
+## > License
 
 Distributed under the MIT License. See `LICENSE` for more information.
+
+Icons by [Lucide](https://lucide.dev/) under the ISC License. See [assets/icons/LICENSE](assets/icons/LICENSE).
 
 ---
 
 <kbd>With</kbd> <kbd>❤️</kbd> <kbd>by</kbd> <kbd>Agzes</kbd><br>
 <kbd>pls ⭐ project!</kbd>
-
-[Download]: https://github.com/Agzes/totray/releases
-[Installation]: #installation
-[Build]: #build
-[Usage]: #usage
-[CLI]: #cli-management

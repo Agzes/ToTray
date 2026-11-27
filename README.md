@@ -5,7 +5,7 @@
   <kbd>❄️ Hyprland</kbd>
 
 <br><br><img src="assets/logo.png" width="128" alt="ToTray logo"/>
-  <h1>ToTray <sup><kbd>v.1.0.0</kbd></sup></h1>
+  <h1>ToTray <sup><kbd>v.1.0.1</kbd></sup></h1>
   <p><b>An automated application manager and tray utility for Hyprland.</b></p>
 
   <p>
@@ -36,8 +36,20 @@
 Download the latest AppImage from the [Releases page](https://github.com/Agzes/totray/releases), make it executable, and run it:
 
 ```bash
-chmod +x ToTray-v1.0.0.AppImage
-./ToTray-v1.0.0.AppImage
+chmod +x ToTray-1.0.1-x86_64.AppImage
+./ToTray-1.0.1-x86_64.AppImage
+```
+
+### Debian / Ubuntu (.deb)
+
+```bash
+sudo apt install ./ToTray-1.0.1-linux-x64.deb
+```
+
+### Fedora / RHEL / openSUSE (.rpm)
+
+```bash
+sudo dnf install ./ToTray-1.0.1-linux-x64.rpm
 ```
 
 ### Arch Linux (AUR)

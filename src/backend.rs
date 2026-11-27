@@ -454,6 +454,11 @@ fn clean_current_exe() -> Option<std::path::PathBuf> {
 }
 
 fn resolve_bin() -> Option<std::path::PathBuf> {
+    if detect_aur_package().is_some()
+        && let Some(exe) = clean_current_exe()
+    {
+        return Some(exe);
+    }
     let local = dirs::home_dir()?.join(".local/bin/totray");
     if local.exists() {
         return Some(local);
@@ -587,6 +592,15 @@ fn remove_hyprland_autostart() -> bool {
 }
 
 pub fn desktop_file_exists() -> bool {
+    if detect_aur_package().is_some() {
+        return true;
+    }
+    for sys_dir in ["/usr/share/applications", "/usr/local/share/applications"] {
+        let base = std::path::Path::new(sys_dir);
+        if base.join("totray.desktop").exists() || base.join(format!("{APP_ID}.desktop")).exists() {
+            return true;
+        }
+    }
     if let Some(data_dir) = dirs::data_local_dir() {
         return data_dir.join("applications/totray.desktop").exists()
             || data_dir

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1] - 2026-11-27
+
+### Fixed
+
+- **Auto-Start (AUR / System Installs)**: `desktop_file_exists` now detects AUR packages and system-wide `.desktop` entries in `/usr/share/applications` and `/usr/local/share/applications`, and `resolve_bin` uses `/usr/bin/totray` directly instead of copying to `~/.local/bin/totray`.
+
+---
+
 ## [1.0.0] Iced Rewrite & Hyprland Actions - 2026-11-27
 
 ### Added

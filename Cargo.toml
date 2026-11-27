@@ -1,6 +1,6 @@
 [package]
 name = "totray"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 description = "AutoRun utility for hyprland."
 repository = "https://github.com/Agzes/totray"
